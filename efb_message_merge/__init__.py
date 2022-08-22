@@ -45,11 +45,11 @@ class MessageMergeMiddleware(Middleware):
 
     def process_message(self, message: Message) -> Optional[Message]:
         if message.type == MsgType.Text:
-            return mergetextmessage(message)
+            return self.mergetextmessage(message)
         return message
         
 
-    def mergetextmessage(self, message: Message) -> Optional[Message]:    
+    def mergetextmessage(self, message: Message) -> Optional[Message]:
         if self.sent_by_master(message):
             self.messagecache.append(message)
             if len(self.messagecache)>30:
@@ -57,7 +57,10 @@ class MessageMergeMiddleware(Middleware):
             return message
         else:
             for i in self.messagecache:
-                if i.text == message.text:
-                    message.edit = True
-                    self.messagecache.pop(i)
-                    return i
+                if i.text == message.text and i.chat.uid == message.chat.uid :
+                    self.messagecache.remove(i)
+                    #message.edit = True
+                    #message.uid = i.uid
+                    #message.deliver_to = coordinator.master
+                    return None 
+        return message
