@@ -1,7 +1,7 @@
 # MessageMergeMiddleware
 1.安装
 
-```pip install git+https://github.com/QQ-War/efb-message-merge.git```
+```pip install git+https://github.com/QQ-War/efb_message_merge.git```
 
 2.注册到middleware
 
