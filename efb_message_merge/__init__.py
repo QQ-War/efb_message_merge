@@ -66,6 +66,9 @@ class MessageMergeMiddleware(Middleware):
         if message.type == MsgType.Text and self.mastersendback:
             message = self.mergemastersendouttextmessage(message)
         
+        if message == None:
+            return message
+
         for i in self.samemessageconfig:
             if message.text == i:
                 message = self.mergesamemessage(message, i)
@@ -99,15 +102,23 @@ class MessageMergeMiddleware(Middleware):
         name=get_name()
 
         def implement():
-            message.text = samemessage+'\n' + name+"*1"
             self.smmcache[samemessage][message.chat.uid] = {
                 'time': time.time(),
                 'members': {name:1},
                 'uid': message.uid
             }
+            temptext = message.text
+            message.text = samemessage+'\n' + name+"*1"
             message.author = sys_author
-            #message.chat.notification = ChatNotificationState.ALL
-            return message
+
+            if self.sent_by_master(message):
+                message.text = temptext
+                message.author = message.chat.self
+                self.smmcache[samemessage][message.chat.uid]['uid'] = "{uni_id}".format(uni_id=str(int(time.time())))
+                return message
+            else:
+                #message.chat.notification = ChatNotificationState.ALL
+                return message
 
         sys_author = message.chat.make_system_member(
             uid="QQ_War.message_merge",
@@ -119,9 +130,11 @@ class MessageMergeMiddleware(Middleware):
         if message.chat.uid not in self.smmcache[samemessage]:
             return implement()
         else:
-            # The original samemessage should be valid only within 2 hours
-            if time.time() - self.smmcache[samemessage][message.chat.uid]["time"] < 7200.0:
+            # The last samemessage should be valid only within 10 minutes
+            if time.time() - self.smmcache[samemessage][message.chat.uid]["time"] < 600.0:
                 # Update Msg
+                self.smmcache[samemessage][message.chat.uid]["time"] = time.time()
+
                 if name in self.smmcache[samemessage][message.chat.uid]["members"].keys():
                     self.smmcache[samemessage][message.chat.uid]["members"][name]+=1
                 else:
