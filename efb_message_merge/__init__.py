@@ -69,9 +69,10 @@ class MessageMergeMiddleware(Middleware):
         if message == None:
             return message
 
-        for i in self.samemessageconfig:
-            if message.text == i:
-                message = self.mergesamemessage(message, i)
+        if isinstance(message.chat, GroupChat):
+            for i in self.samemessageconfig:
+                if message.text == i:
+                    message = self.mergesamemessage(message, i)
 
         return message
         
@@ -107,18 +108,12 @@ class MessageMergeMiddleware(Middleware):
                 'members': {name:1},
                 'uid': message.uid
             }
-            temptext = message.text
-            message.text = samemessage+'\n' + name+"*1"
-            message.author = sys_author
+            #message.author = sys_author
 
             if self.sent_by_master(message):
-                message.text = temptext
-                message.author = message.chat.self
+                #message.author = message.chat.self
                 self.smmcache[samemessage][message.chat.uid]['uid'] = "{uni_id}".format(uni_id=str(int(time.time())))
-                return message
-            else:
-                #message.chat.notification = ChatNotificationState.ALL
-                return message
+            return message
 
         sys_author = message.chat.make_system_member(
             uid="QQ_War.message_merge",
