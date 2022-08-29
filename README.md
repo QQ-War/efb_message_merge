@@ -25,6 +25,8 @@ middlewares:
 ```
 mastersendback: True
 
+messagekeeptime: 120
+#此处单位是分钟，不配置的话，默认时间5分钟。
 samemessage:
  - "收到/取消 群语音邀请"
  - "收到"

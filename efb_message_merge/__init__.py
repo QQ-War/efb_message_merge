@@ -26,6 +26,7 @@ class MessageMergeMiddleware(Middleware):
         self.config = self.load_config(config_path)
         self.mastersendback = self.config.get("mastersendback", True)
         self.samemessageconfig = self.config.get('samemessage', [])
+        self.messagekeeptime = self.config.get('messagekeeptime', 5)
 
         self.mastersendoutmessagecache = list()
         """ 
@@ -126,7 +127,7 @@ class MessageMergeMiddleware(Middleware):
             return implement()
         else:
             # The last samemessage should be valid only within 10 minutes
-            if time.time() - self.smmcache[samemessage][message.chat.uid]["time"] < 600.0:
+            if time.time() - self.smmcache[samemessage][message.chat.uid]["time"] < self.messagekeeptime*60:
                 # Update Msg
                 self.smmcache[samemessage][message.chat.uid]["time"] = time.time()
 
