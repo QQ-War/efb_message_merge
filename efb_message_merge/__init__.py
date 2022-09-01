@@ -25,14 +25,16 @@ class MessageMergeMiddleware(Middleware):
         config_path = efb_utils.get_config_path(self.middleware_id)
         self.config = self.load_config(config_path)
         self.mastersendback = self.config.get("mastersendback", True)
-        self.samemessageconfig = self.config.get('samemessage', [])
+        self.samemessagegroupconfig = self.config.get('samemessagegroup', [])
+        self.samemessageprivateconfig = self.config.get('samemessageprivate',[])
         self.messagekeeptime = self.config.get('messagekeeptime', 5)
 
         self.mastersendoutmessagecache = list()
         """ 
             [message1, message2,...]
         """
-        self.smmcache = {}
+        self.smmgroupcache = {}
+        self.smmprivatecache = {}
         """
             [samemessage:{
                 "[group_id]":
@@ -44,8 +46,10 @@ class MessageMergeMiddleware(Middleware):
                 }
             ]
         """
-        for i in self.samemessageconfig:
-            self.smmcache[i] = {}
+        for i in self.samemessagegroupconfig:
+            self.smmgroupcache[i] = {}
+        for i in self.samemessageprivateconfig:
+            self.smmprivatecache[i] = {}
 
 
     @staticmethod
@@ -71,9 +75,13 @@ class MessageMergeMiddleware(Middleware):
             return message
 
         if isinstance(message.chat, GroupChat):
-            for i in self.samemessageconfig:
+            for i in self.samemessagegroupconfig:
                 if message.text == i:
-                    message = self.mergesamemessage(message, i)
+                    message = self.mergesamemessage(message, 'group', i)
+        else:
+            for i in self.samemessageprivateconfig:
+                if message.text == i:
+                    message = self.mergesamemessage(message, 'private', i)
 
         return message
         
@@ -94,7 +102,12 @@ class MessageMergeMiddleware(Middleware):
                     return None 
         return message
 
-    def mergesamemessage(self, message: Message, samemessage: str):
+    def mergesamemessage(self, message: Message, key: str, samemessage: str):
+        if key == 'group':
+            smmcache = self.smmgroupcache
+        elif key == 'private':
+            smmcache = self.smmprivatecache
+
         def get_name():
             if message.author.alias == '' or message.author.alias is None:
                 return message.author.name
@@ -104,7 +117,7 @@ class MessageMergeMiddleware(Middleware):
         name=get_name()
 
         def implement():
-            self.smmcache[samemessage][message.chat.uid] = {
+            smmcache[samemessage][message.chat.uid] = {
                 'time': time.time(),
                 'members': {name:1},
                 'uid': message.uid
@@ -113,7 +126,7 @@ class MessageMergeMiddleware(Middleware):
 
             if self.sent_by_master(message):
                 #message.author = message.chat.self
-                self.smmcache[samemessage][message.chat.uid]['uid'] = "{uni_id}".format(uni_id=str(int(time.time())))
+                smmcache[samemessage][message.chat.uid]['uid'] = "{uni_id}".format(uni_id=str(int(time.time())))
             return message
 
         sys_author = message.chat.make_system_member(
@@ -123,26 +136,26 @@ class MessageMergeMiddleware(Middleware):
         )
 
 
-        if message.chat.uid not in self.smmcache[samemessage]:
+        if message.chat.uid not in smmcache[samemessage]:
             return implement()
         else:
             # The last samemessage should be valid only within 10 minutes
-            if time.time() - self.smmcache[samemessage][message.chat.uid]["time"] < self.messagekeeptime*60:
+            if time.time() - smmcache[samemessage][message.chat.uid]["time"] < self.messagekeeptime*60:
                 # Update Msg
-                self.smmcache[samemessage][message.chat.uid]["time"] = time.time()
+                smmcache[samemessage][message.chat.uid]["time"] = time.time()
 
-                if name in self.smmcache[samemessage][message.chat.uid]["members"].keys():
-                    self.smmcache[samemessage][message.chat.uid]["members"][name]+=1
+                if name in smmcache[samemessage][message.chat.uid]["members"].keys():
+                    smmcache[samemessage][message.chat.uid]["members"][name]+=1
                 else:
-                    self.smmcache[samemessage][message.chat.uid]["members"][name]=1
+                    smmcache[samemessage][message.chat.uid]["members"][name]=1
                 
                 if not self.sent_by_master(message):
                     message.text = samemessage + "\n"
-                    for i in self.smmcache[samemessage][message.chat.uid]["members"]:
-                        message.text += i + "*" + str(self.smmcache[samemessage][message.chat.uid]["members"][i]) +", "
+                    for i in smmcache[samemessage][message.chat.uid]["members"]:
+                        message.text += i + "*" + str(smmcache[samemessage][message.chat.uid]["members"][i]) +", "
                     message.text.strip(", ")
                     message.edit = True
-                    message.uid = MessageID(self.smmcache[samemessage][message.chat.uid]["uid"])
+                    message.uid = MessageID(smmcache[samemessage][message.chat.uid]["uid"])
                     message.author = sys_author
                     message.type = MsgType.Text
 
