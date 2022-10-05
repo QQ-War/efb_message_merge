@@ -127,14 +127,14 @@ class MessageMergeMiddleware(Middleware):
             smmcache[samemessage][message.chat.uid] = {
                 'time': time.time(),
                 'members': {name:1},
-                'uid': message.uid+'QQ_War.message_merge'
+                'uid': str(message.uid)+'QQ_War.message_merge'
             }
             #message.author = sys_author
 
             #if self.sent_by_master(message):
                 #message.author = message.chat.self
             #    smmcache[samemessage][message.chat.uid]['uid'] = "{uni_id}".format(uni_id=str(int(time.time())))
-            message.uid += 'QQ_War.message_merge'
+            message.uid = str(message.uid)+'QQ_War.message_merge'
             return message
 
         sys_author = message.chat.make_system_member(
