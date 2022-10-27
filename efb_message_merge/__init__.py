@@ -3,6 +3,7 @@ import logging
 import time
 import yaml
 import re
+import copy
 from typing import Optional, Union, Dict
 from typing import Dict , Any
 
@@ -85,6 +86,9 @@ class MessageMergeMiddleware(Middleware):
         if message == None:
             return message
 
+        if self.comwechatretrive and message.type in [MsgType.Text, MsgType.Unsupported]:
+            message = self.retrive(message)
+
         if isinstance(message.chat, GroupChat):
             for i in self.samemessagegroupconfig:
                 if message.text == i:
@@ -93,9 +97,6 @@ class MessageMergeMiddleware(Middleware):
             for i in self.samemessageprivateconfig:
                 if message.text == i:
                     message = self.mergesamemessage(message, 'private', i)
-
-        if self.comwechatretrive and message.type in [MsgType.Text, MsgType.Unsupported]:
-            message = self.retrive(message)
 
         return message
         
@@ -106,7 +107,7 @@ class MessageMergeMiddleware(Middleware):
             #self.logger.debug('master send message:'+str(message))
             if len(self.mastersendoutmessagecache)>30:
                 self.mastersendoutmessagecache.pop(0)
-            return message
+            return copy.deepcopy(message)
         else:
             for i in self.mastersendoutmessagecache:
                 if i.text == message.text and i.chat.uid == message.chat.uid :
@@ -116,7 +117,7 @@ class MessageMergeMiddleware(Middleware):
                     #message.uid = i.uid
                     #message.deliver_to = coordinator.master
                     return None 
-        return message
+        return copy.deepcopy(message)
 
     def mergesamemessage(self, message: Message, key: str, samemessage: str):
         if key == 'group':
@@ -204,6 +205,6 @@ class MessageMergeMiddleware(Middleware):
             message.text = '消息已撤回\n-----\n' + message.text
             message.edit = True
 
-        return message
+        return copy.deepcopy(message)
 
             
