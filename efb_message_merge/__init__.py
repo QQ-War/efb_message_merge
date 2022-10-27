@@ -33,6 +33,7 @@ class MessageMergeMiddleware(Middleware):
         self.samemessagegroupconfig = self.config.get('samemessagegroup', [])
         self.samemessageprivateconfig = self.config.get('samemessageprivate',[])
         self.messagekeeptime = self.config.get('messagekeeptime', 5)
+        self.comwechatretrive = self.config.get('comwechatretrive', False)
 
         self.mastersendoutmessagecache = list()
         """ 
@@ -55,6 +56,11 @@ class MessageMergeMiddleware(Middleware):
             self.smmgroupcache[i] = {}
         for i in self.samemessageprivateconfig:
             self.smmprivatecache[i] = {}
+
+        self.comwechatretrivecache = list()
+        """
+            [(messageid1, message1), (messageid2, message2),...]
+        """
 
 
     @staticmethod
@@ -88,13 +94,16 @@ class MessageMergeMiddleware(Middleware):
                 if message.text == i:
                     message = self.mergesamemessage(message, 'private', i)
 
+        if self.comwechatretrive and message.type in [MsgType.Text, MsgType.Unsupported]:
+            message = self.retrive(message)
+
         return message
         
 
     def mergemastersendouttextmessage(self, message: Message) -> Optional[Message]:
         if self.sent_by_master(message):
             self.mastersendoutmessagecache.append(message)
-            self.logger.debug('master send message:'+str(message))
+            #self.logger.debug('master send message:'+str(message))
             if len(self.mastersendoutmessagecache)>30:
                 self.mastersendoutmessagecache.pop(0)
             return message
@@ -145,7 +154,7 @@ class MessageMergeMiddleware(Middleware):
 
 
         if message.chat.uid not in smmcache[samemessage]:
-            self.logger.debug('first message to be merged:'+str(message))
+            #self.logger.debug('first message to be merged:'+str(message))
             return implement()
         else:
             # The last samemessage should be valid only within 10 minutes
@@ -170,11 +179,31 @@ class MessageMergeMiddleware(Middleware):
 
                 #message.chat.notification = ChatNotificationState.ALL
 
-                self.logger.debug('messages merged:'+str(message))
+                #self.logger.debug('messages merged:'+str(message))
                 return message
             # If not, implement a new one
             else:
-                self.logger.debug('messages to be merged start over:'+str(message))
+                #self.logger.debug('messages to be merged start over:'+str(message))
                 return implement()
 
         return message
+
+    def retrive(self, message):
+        if message.type == MsgType.Text:
+            self.comwechatretrivecache.append((message.uid, message))
+            self.logger.debug('message.cache'+str(message.uid))
+            if len(self.comwechatretrivecache) > 30:
+                self.comwechatretrivecache.pop(0)
+        elif message.text.startswith('消息已撤回') and message.type == MsgType.Unsupported :
+            messageid = message.text[5::]
+            for (a,b) in self.comwechatretrivecache:
+                if str(a) == str(messageid):
+                    message = b
+                    self.comwechatretrivecache.remove((a,b))
+                    break
+            message.text = '消息已撤回\n-----\n' + message.text
+            message.edit = True
+
+        return message
+
+            
